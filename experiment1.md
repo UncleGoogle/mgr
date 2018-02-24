@@ -26,29 +26,28 @@ confocal lens and photosensitive matrix inside camera (C)
 C should have small DoF
 C at initial position should capture idally short image
 
-def display_dot_on_object(d):
-"""d - distance between LL and O"""
+    def display_dot_on_object(d):
+    """d - distance between LL and O"""
 
-    X______LM____O
-    _________C
+        X______LM____O
+        _________C
 
 
-def enligth_whole_object(d):
-"""d - distance between LL and O"""
+    def enligth_whole_object(d):
+    """d - distance between LL and O"""
 
-    X______L_____O
-    _________C
+        X______L_____O
+        _________C
 
 
 ##Experimental method
 
-
-for d in [f, f+dx, ... f+n*dx]:
-    1. make_environment_dark()
-    2. display_dot_on_object(d)
-    3. take_shot()
-    4. enlight_whole_object(d)
-    5. take_shot()
+    for d in [f, f+dx, ... f+n*dx]:
+        1. make_environment_dark()
+        2. display_dot_on_object(d)
+        3. take_shot()
+        4. enlight_whole_object(d)
+        5. take_shot()
 
 So we have sht like:
 
