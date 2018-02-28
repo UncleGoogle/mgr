@@ -75,24 +75,11 @@ def readImages(filenames, dtype=None, color_mode=0):
 
     images = []
     for name in filenames:
+        import ipdb; ipdb.set_trace()  # XXX BREAKPOINT
         im = cv2.imread(name, color_mode)
 
         # search for normalization factor (max no. to divide by)
-        # update: the same as np.iinfo...:
-        # max_no = np.iinfo(im.dtype).max
-        max_no = None
-        m = re.search(r"(int|uint)(\d)", str(im.dtype))
-        if m and m.group(1):
-            if m.group(2):
-                max_no = 2 ** int(m.group(2)) - 1
-            else:  # typically int == int64; float == float64
-                max_no = 2 ** 64 - 1
-            if m.group(1) == 'int':  # as the range is [-x/2-1 to x/2]
-                max_no //= 2
-        else:
-            max_abs_in_array = np.nanmax(np.abs(im))  # just normalization
-            if max_abs_in_array > 1:
-                max_no = max_abs_in_array
+        max_no = np.iinfo(im.dtype).max
 
         if im.dtype != dtype:
             im = np.asarray(im, dtype=dtype)
