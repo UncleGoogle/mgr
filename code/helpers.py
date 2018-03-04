@@ -1,5 +1,7 @@
 from uuid import uuid4
+from typing import Union, List, Iterable
 import re
+
 
 import cv2
 import numpy as np
@@ -18,10 +20,15 @@ class Boardspace:
             self.figure = plt.figure(1, figsize=(x/100, x/100)) # size in inches
             plt.title = self.title
         else:
-            cv2.namedWindow(self.window_name, option)
-            cv2.resizeWindow(self.window_name, x, y)
+            cv2.namedWindow(self.title, option)
+            cv2.resizeWindow(self.title, x, y)
 
-    def show(self, images, labels, waitSeconds=0, normalize=False, output=None):
+    def show(self,
+             images: Iterable[np.ndarray],
+             labels: Union[Iterable[str], None] = None,
+             waitSeconds=0,
+             normalize=False,
+             output=None) -> None:
         """show images one after another
         :param images       iterable of any numerable image format
         :param labels       iterable of labels corresponding to images
@@ -30,9 +37,6 @@ class Boardspace:
         :param normalize    boolean indicating if normalize to range [0,1].
         :param output       dont show, but save figure at given output
         """
-        if not images or not len(images):
-            raise SyntaxError("images should be iterable")
-
         for i, im in enumerate(images):
             if np.iscomplexobj(im):
                 im = np.abs(im)
@@ -42,10 +46,11 @@ class Boardspace:
                 im = (im - min_val) / (max_val - min_val)
             if self.mpl:
                 subplt = plt.subplot(len(images), 1, i+1)
-                subplt.set_ylabel(labels[i], fontsize=20)
+                if labels is not None:
+                    subplt.set_ylabel(labels[i], fontsize=20)
                 plt.imshow(im, cmap='gray')
             else:
-                cv2.imshow(self.window_name, im)
+                cv2.imshow(self.title, im)
                 cv2.waitKey(waitSeconds*1000)
         if self.mpl:
             if output:
@@ -75,8 +80,9 @@ def readImages(filenames, dtype=None, color_mode=0):
 
     images = []
     for name in filenames:
-        import ipdb; ipdb.set_trace()  # XXX BREAKPOINT
         im = cv2.imread(name, color_mode)
+        if im is None:
+            raise OSError('image {} load failed!'.format(name))
 
         # search for normalization factor (max no. to divide by)
         max_no = np.iinfo(im.dtype).max

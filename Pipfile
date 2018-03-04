@@ -7,7 +7,12 @@ name = "pypi"
 
 [dev-packages]
 
+ipdb = "*"
+icecream = "*"
 
 
 [packages]
 
+six = "*"
+matplotlib = "*"
+opencv-python = "*"
