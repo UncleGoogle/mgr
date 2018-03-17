@@ -150,3 +150,6 @@ Session.vim
 
 # Auto-generated tag files
 tags
+
+# ------------ VSCode ---------
+.vscode/
