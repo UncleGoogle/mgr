@@ -20,7 +20,7 @@ parser.add_argument('--kowalsky', type=float, help="factor to enhance divition",
                     default=0.0001)
 
 args = parser.parse_args()
-output_path = pathlib.Path(args.output).resolve()
+output_path = pathlib.Path(args.output).resolve() if args.output else None
 kowalsky = args.kowalsky
 
 # -------------------------------------reading images-------------------------
