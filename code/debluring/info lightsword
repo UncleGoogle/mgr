@@ -1,0 +1,32 @@
+file new
+import lena
+open in aplitude
+structure matówka
+propagation On-asis
+
+file -config : lambda 0,632 czy cos takiego i optyka po 10mm
+-> 1000mm i 6 krokoów quality - high
+
+takie spekle duże
+
+soczewka 500
+
+obraz ------2f=1000----lens ---------2f----------Here obraz "lenka shart"
+
+dalej: on-axis propagation 10mm, 20, 30 zarówno lenke jak i literki
+
+soczewka -1000 -> po to aby zrobiĵ źródło punktowe
+potem soczewka 500
+propagacja 1000
+i powinniśmy miec kropeczke na srodku
+potem 10, 20, 30mm 
+(to była macierz kwadratowa -> sincus dyfrakcyjnie)
+
+
+teraz z przemnożeniem przez circua (radius 10.24mm)
+i potem to samo(soczewski)
+-besslowa kropka-> (psf_sharp_circus) (jak obiektyw - koło)
+10, 20, 30
+
+
+
