@@ -10,6 +10,7 @@ name = "pypi"
 ipdb = "*"
 icecream = "*"
 pylint = "*"
+pytest = "*"
 
 
 [packages]

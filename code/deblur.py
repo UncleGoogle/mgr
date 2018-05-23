@@ -11,7 +11,7 @@ from helpers.readImage import readImage
 
 # -------------------------------------Arguments & Settings-------------------
 
-root_path = pathlib.Path(__file__).absolute().parents[1]
+# root_path = pathlib.Path(__file__).absolute().parents[1]
 
 parser = argparse.ArgumentParser()
 parser.add_argument('image', type=str, help="Blured image")
