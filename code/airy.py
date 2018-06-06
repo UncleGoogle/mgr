@@ -5,10 +5,10 @@ import pathlib
 import os
 import numpy
 
-from .helpers.readImage import readImage
+from helpers.readImage import readImage
 
 def read_a(im, threshold):
-    """Calculates CoC from horizontal image crossection.
+    """Calculates CoC from horizontal image crossection at half for height
     :param im           numpy array image
     :param threshold    [0-255]
     :return             diameter of middle maximum
@@ -17,11 +17,10 @@ def read_a(im, threshold):
     a_px = 0
     for px in middle_crossection:
         if px >= threshold:
-            a_px = a_px + 1
+            a_px += 1
     return a_px
 
 def main():
-
     # -------------------------------------Arguments & Settings-------------------
     # print whole array
     numpy.set_printoptions(threshold=sys.maxsize)
@@ -32,7 +31,7 @@ def main():
     r = 27.75
     d = 2*r
     sampling_ls = 1  # um to px ratio
-    sampling = 0.001*sampling_ls  # mm to px ratio
+    sampling = 0.001 * sampling_ls  # mm to px ratio
     threshold = 8  # cutoff for pixels
 
     pre_propostions_a  = r / f
@@ -47,10 +46,8 @@ def main():
     # -------------------------------------reading images-------------------------
 
     for p in pathlib.Path(args.inputDir).iterdir():
-        if not (p.is_file() and p.suffix == '.bmp'):
+        if not (p.is_file() and p.suffix == '.bmp' or p.suffix == ".JPG"):
             continue
-        # both methods have the same result - conlusion: LS output images are
-        # normalized -> so we can only use relative threshold
 
         # im = cv2.imread(str(p.absolute()), 0)
         im = readImage(str(p.absolute()))
@@ -64,9 +61,11 @@ def main():
         proportions_a = pre_propostions_a * x
         proportions_a_px = proportions_a // sampling
         print(row.format('CoC (proportionally)', proportions_a, proportions_a_px))
-        airy_a = pre_airy_a * (f + x)
-        airy_a_px = airy_a // sampling
-        print(row.format('Airy first disk', airy_a, airy_a_px))
+
+        # commented out becase airy middle disk investigation is depracated
+        # airy_a = pre_airy_a * (f + x)
+        # airy_a_px = airy_a // sampling
+        # print(row.format('Airy first disk', airy_a, airy_a_px))
 
         # -----------------------------Measure a from an image-------------------
         a_px = read_a(im, threshold=threshold)

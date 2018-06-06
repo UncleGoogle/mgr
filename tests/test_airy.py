@@ -15,4 +15,3 @@ def test_read_a_simple(im):
 
 def test_read_a_with_dark_disks(im):
     assert airy.read_a(im, threshold=2) == 5
-
