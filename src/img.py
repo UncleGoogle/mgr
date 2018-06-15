@@ -8,7 +8,7 @@ import numpy as np
 
 
 class ImgSet(object):
-    """keeps set of images common for secific purpose"""
+    """keeps series of experimental images"""
 
     def __init__(self, name, imgs, path):
         """
@@ -85,57 +85,69 @@ class Img(object):
     def __repr__(self):
         return f'<Img class instance> {self.kind}: {self.path} at {self.x}mm'
 
-    def _findCircle(self):
+    def _find_circle(self):
 
         if self.im is None:
-            print('self.im not loaded my ladies')
-            return
+            raise RuntimeError('self.im not loaded my ladies')
 
-        # -------------------------------------blur image---------------------------
-        # im = cv2.medianBlur(im, 5)
+        # # -------------------------------------blur image---------------------------
+        # im = cv2.medianBlur(self,im, 5)
         # cv2.imshow("output", im)
         # cv2.waitKey()
 
-        output = im.copy()
+        output = self.im.copy()
 
         print(f'searching for circles...')
         circles = cv2.HoughCircles(self.im,
-                                cv2.HOUGH_GRADIENT,
-                                dp=2,
-                                minDist=4,
-                                param1=100,
-                                param2=100,
-                                minRadius=1
-                                )
+                                   cv2.HOUGH_GRADIENT,
+                                   dp=2,
+                                   minDist=4,
+                                   param1=100,
+                                   param2=100,
+                                   minRadius=5
+                                  )
 
-        if circles is not None:
-            print(f'found {circles.shape[1]} circles')
-            circles = np.round(circles).astype("int")
+        if circles is None:
+            print('No circles found')
+            return
 
-            # debug/testing
-            # for (x, y, r) in circles:
-            #     cv2.circle(output, (x, y), r, (255, 255, 255), 1)
-            #     cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (255, 255, 255), -1)
-            #     cv2.imshow("output", np.hstack([im, output]))
-            #     cv2.waitKey(0)
+        print(f'found {len(circles)} circles')
+        circles = np.round(circles[0]).astype("int")
 
-            if circles.shape[1] != 1:
-                raise NotImplementedError("more than 1 circle are found")
-            return circles[0]
+        # show matches for testing purposes
+        for (x, y, r) in circles:
+            cv2.circle(output, (x, y), r, (255, 255, 255), 1)
+            cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (255, 255, 255), -1)
+            cv2.imshow("output", np.hstack([self.im, output]))
+            cv2.waitKey(0)
 
-    def read_a(self, threshold):
+        if circles.shape[0] != 1:
+            raise NotImplementedError("more than 1 circle are found")
+
+        return circles[0]
+
+    def resize_im(self, divide_by):
+        scaled_h = np.round(img1.im.shape[0] // divide_by).astype("int")
+        scaled_w  = np.round(img1.im.shape[1] // divide_by).astype("int")
+        print('resized from {}x{} to: {}x{} '.format(
+            img1.im.shape[0],
+            img1.im.shape[1],
+            scaled_h,
+            scaled_w))
+        im = np.ndarray(shape=(scaled_w, scaled_h))
+        self.im = cv2.resize(img1.im, im.shape)
+
+    def read_a(self):
         """Calculates CoC from horizontal image crossection at half for height
         :param im           numpy array image
-        :param threshold    [0-255]
-        :return             diameter of middle maximum
+        :return             diameter of middle maximum or -1 if circle not found
         """
-        x, y, r = self._findCircle()
-        middle_crossection = self.im[x]
-        a_px = 0
-        for pixel in middle_crossection:
-            if pixel >= threshold:
-                a_px += 1
-        return a_px
+        circle = self._find_circle()
+        if circle is None:
+            return -1
+        else:
+            x, y, r = circle
+            return 2 * r
 
     def readImage(self, dtype=None, color_mode=0):
         """Read image files as numpy arrays using opencv python wrapper.
@@ -178,7 +190,6 @@ class SimulationImg(Img):
         return a_px
 
 
-
 if __name__ == '__main__':
     """for testing purpose"""
 
@@ -189,45 +200,7 @@ if __name__ == '__main__':
     data = ImgSet.load_from_json_factory(sys.argv[1], sys.argv[2])
     img1 = data[0][0]
     img1.readImage()
-
-    # -------------------------------------resize image-------------------------
-    scaled_h, scaled_w = img1.im.shape[0]//8, img1.im.shape[1]//8
-    im = np.ndarray(shape=(scaled_w, scaled_h))
-    im = cv2.resize(img1.im, im.shape)
-    cv2.imshow("output", im)
-    cv2.waitKey()
-
-    # -------------------------------------blur image---------------------------
-    # im = cv2.medianBlur(im, 5)
-    # cv2.imshow("output", im)
-    # cv2.waitKey()
-
-    output = im.copy()
-
-    print(f'searching for circles...')
-    circles = cv2.HoughCircles(im,
-                               cv2.HOUGH_GRADIENT,
-                               dp=2,
-                               minDist=4,
-                               param1=100,
-                               param2=100,
-                               minRadius=1
-                               )
-
-    if circles is not None:
-        print(f'found {circles.shape[1]} circles')
-
-        # convert to integers
-        circles = np.round(circles).astype("int")
-        print('converted to integers')
-
-        for (x, y, r) in circles:
-            # draw a circle that was detected
-            cv2.circle(output, (x, y), r, (255, 255, 255), 1)
-            # mark the circle center
-            cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (255, 255, 255), -1)
-
-            # show the original on the left and ouptut on the right
-            cv2.imshow("output", np.hstack([im, output]))
-            cv2.waitKey(0)
-
+    img1.resize_im(divide_by=8)
+    print('circle diameter is: ', img1.read_a())
+    img1.resize_im(divide_by=1/4)
+    print('circle diameter is: ', img1.read_a())

@@ -11,6 +11,7 @@ ipdb = "*"
 icecream = "*"
 pylint = "*"
 pytest = "*"
+"pep8" = "*"
 
 
 [packages]
