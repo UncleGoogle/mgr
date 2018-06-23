@@ -1,52 +1,75 @@
-""" openCV lider module """
-import sys
+""" slider decorator for openCV image display """
 from functools import wraps
 
 import cv2
 
 
-def cv2_slider(sliders):
+def cv2_slider(slider):
     """Slider docstring"""
     def decorator(function):
-        """Inner decorator docstring"""
         @wraps(function)  # to don't lose decorated function docsting and name
-        def wrapper():
-            """very inner wrapper doscring"""
+        def wrapper(*args, **kwargs):
 
-            # cv2.namedWindow('preview', cv2.WINDOW_NORMAL)  # resizable window
+            cv2.namedWindow('preview', cv2.WINDOW_NORMAL)  # resizable window
+
+            other_kwargs = {}
+            slider_kwargs = {}
+            nothing = lambda _: None
+            for key, value in kwargs.items():
+                if key == slider:
+                    try:
+                        cv2.createTrackbar(key, 'preview', value, 100, nothing)
+                        slider_kwargs[key] = value
+                    except TypeError as e:
+                        raise TypeError(f'wrong value for "{key}" in slider; ' + str(e))
+                else:
+                    other_kwargs[key] = value
+
+
 
             # low_tresh = 10
-            # nothing = lambda _: None
-            # # cv2.createTrackbar('_', 'preview', 0, 100, nothing)  # cv2 bug workaround
-            # cv2.createTrackbar('low_tresh', 'preview', low_tresh, 100, nothing)
-            # cv2.imshow('preview', im)
 
-            # while True:
+            # cv2.createTrackbar('_', 'preview', 0, 100, nothing)  # cv2 bug workaround
+            # cv2.createTrackbar(slider, 'preview', low_tresh, 100, nothing)
+            cv2.imshow('preview', im)
 
-            #     low_tresh = cv2.getTrackbarPos('low_tresh', 'preview')
+            res = function(*args, **{**slider_kwargs, **other_kwargs})
 
-            #     # function(im, low_tresh, *args)
-            #     cv2.circle(im, (200, 200), low_tresh, (0,0,255), -1)
+            while True:
 
-            #     cv2.imshow('preview', im)
+                for key, value in slider_kwargs.items():
+                    slider_kwargs[key] = cv2.getTrackbarPos(key, 'preview')
+                    print('updating tracker position to ', slider_kwargs[key])
 
-            #     key = cv2.waitKey(300)
-            #     if key == 27 or key == 13:
-            #         break
+                res = function(*args, **{**slider_kwargs, **other_kwargs})
+
+                cv2.imshow('preview', res)
+
+                key = cv2.waitKey(1000)
+                if key == 27 or key == 13:
+                    break
 
         return wrapper
     return decorator
 
 
 if __name__ == "__main__":
+    import sys
 
-    @cv2_slider("arg")
-    def example():
-        """Original function"""
+    im = cv2.imread(sys.argv[1], 0)
+    if im is None:
+        raise OSError('image {} load failed!'.format(self.path))
 
-    print(example.__name__)
-    print(example.__doc__)
+    @cv2_slider("gumiak")
+    def testSlider(name, other, gumiak=10):
+        """Original docsting"""
+        cv2.circle(im, (200, 200), radius, (255, 255, 255))
+        return im
 
+    radius = 50
+    # cv2.imshow(im)
+    # cv2.waitKey()
+    testSlider('TheName', other=3, gumiak=4)
 
     # def auto_crop(self, margin):
     #     """Crops image leaving given margin from both side.

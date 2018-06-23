@@ -6,7 +6,7 @@ import os
 import numpy
 
 from helpers.readImage import readImage
-from img import Img, ImgSet
+from img import ExperimentalImg, SimulationImg, ImgSet
 
 def main():
     # -------------------------------------Arguments & Settings-------------------
@@ -25,20 +25,28 @@ def main():
     pre_propostions_a  = r / f
     pre_airy_a = 1.22 * wl / d
 
+    row = "{:<28} {:>5.3f}mm {:>6.0f}px"
+
     parser = argparse.ArgumentParser()
-    parser.add_argument('inputDir', type=str, help="directory with files to be processed")
+    parser.add_argument('expJson', type=str, help="file describing experimental data in JSON format")
+    parser.add_argument('experimentalDir', type=str, help="directory with experimental images")
+    parser.add_argument('simulationDir', type=str, help="directory with simulation images")
     parser.add_argument('--output', type=str, help="where to store results")
-    parser.add_argument('--data_json', type=str, help="data info file")
-    parser.add_argument('--exp', type=str, help="directory with experimental data to be processed")
     args = parser.parse_args()
+
+    # -------------------------------------reading simulation data----------------
+    # simulation_data = ImgSet.load_simulation_dataset(args.simulationDir, "Airy simulation")
+    # for sim in simulation_data:
+    #     sim.load_image()
+    #     a_px = sim.read_a(threshold=threshold)
+    #     a = a_px * sampling
+    #     print(row.format(f'{sim}', a, a_px))
 
     # -------------------------------------reading experimental data--------------
 
-    experimental_data = ImgSet.load_from_json_factory(args.data_json, args.exp)
-    # import ipdb; ipdb.set_trace();
+    experimental_data = ImgSet.load_experimental_dataset(args.expJson, args.experimentalDir)
     data = filter(lambda img: img.kind == 'dot', experimental_data['maxwell'])
-    scale = 4
-    row = "{:<28} {:>5.3f}mm {:>6.0f}px"
+    scale = 2
     for img in data:
         img.load_image()
         img.resize_im(scale_down_by=scale)

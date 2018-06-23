@@ -1,12 +1,15 @@
-"""provide classes describing images generated in experiment"""
+"""Provids API to images generated in simulations and those from the experiment.  """
 
 import json
+import pathlib
+import abc
 import pathlib
 
 import cv2
 import numpy as np
 
 from slider import cv2_slider
+from statistics import timeit
 
 
 class ImgSet(object):
@@ -38,7 +41,19 @@ class ImgSet(object):
         return self.imgs[i]
 
     @classmethod
-    def load_from_json_factory(cls, json_path, data_path):
+    def load_simulation_dataset(cls, data_path, dataset_name):
+        """
+        :param data_path    path directory containing all data
+        """
+        imgs = []
+        for p in pathlib.Path(data_path).iterdir():
+            if p.is_file() and (p.suffix == '.bmp' or p.suffix == ".JPG"):
+                x = int(p.stem.split('_')[-1])  # reading x from image filename
+                imgs.append(SimulationImg('dot', p, x))
+        return ImgSet(dataset_name, imgs, data_path)
+
+    @classmethod
+    def load_experimental_dataset(cls, json_path, data_path):
         """
         :param json_path    path to json file containing data
         :param data_path    path directory containing all data
@@ -54,19 +69,76 @@ class ImgSet(object):
             dataset_path = data_path / dataset_name
             imgs = []
             for i in dataset[dataset_name]['imgs']:
-                im_path = dataset_path / ('_MG_' + str(i['name']) + '.JPG')
-                imgs.append(Img(i['kind'],
-                                im_path,
-                                i['x'] - focus_reference,
-                                i['t'],
-                                i.get('f'),
-                               ))
+                im_path = dataset_path / ('_MG_' + str(i['name']) + '.jpg')
+                imgs.append(ExperimentalImg(i['kind'],
+                                            im_path,
+                                            i['x'] - focus_reference,
+                                            i['t'],
+                                            i.get('f'),
+                                            ))
 
             img_sets[dataset_name] = cls(dataset_name, imgs, path=dataset_path)
         return img_sets
 
 
-class Img(object):
+class Img(abc.ABC):
+    """Abstract image representation. Use ExperimentalImg or SimulationImg."""
+
+    @abc.abstractmethod
+    def __init__(self, kind, path, x):
+        """
+        :param kind     ['img', 'dot']
+        :param path     str or Path pointing to image file
+        :param x        deblured distance (counting from the focal point)
+        """
+        self.kind = kind
+        self.path = path
+        self.x = x
+        self.im = None  # waits for self.load_image()
+
+    def __str__(self):
+        return f'{self.__class__.__name__}: {self.kind} at {self.x}mm'
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}: {self.kind} on {self.path} at {self.x}mm'
+
+    def load_image(self, dtype=None, color_mode=0):
+        """Read image files as numpy arrays using opencv python wrapper.
+        :param color_mode       1 - color, 0 - greyscale(default), -1 - unchanged
+        :param dtype            data type of returned numpy array (ex. np.float32)
+                                If any *float* type is used, convert to [0,1] range.
+                                If not given original is used.
+        :return                 numpy arrays of read image
+        """
+        im = cv2.imread(str(self.path), color_mode)
+        if im is None:
+            raise OSError('image {} load failed!'.format(self.path))
+        # search for normalization factor (max no. to divide by)
+        max_no = np.iinfo(im.dtype).max
+        if im.dtype != dtype:
+            im = np.asarray(im, dtype=dtype)
+        if max_no and im.dtype in [np.float16, np.float32, np.float64]:
+            im = im / max_no
+        self.im = im
+
+    def resize_im(self, scale_down_by):
+        """Scales down self.im
+        :param scale_down_by    int or float to divide both x and y by
+        """
+        output = None
+        scaled_h = np.round(self.im.shape[0] // scale_down_by).astype("int")
+        scaled_w  = np.round(self.im.shape[1] // scale_down_by).astype("int")
+        print('{} resized from {}x{} to: {}x{} '.format(
+            self.path,
+            self.im.shape[0],
+            self.im.shape[1],
+            scaled_h,
+            scaled_w))
+        im = np.ndarray(shape=(scaled_w, scaled_h))
+        self.im = cv2.resize(self.im, im.shape)
+
+
+class ExperimentalImg(Img):
     """represents a shot and image"""
     def __init__(self, kind, path, x, t, f):
         """
@@ -76,19 +148,10 @@ class Img(object):
         :param t        1 over time -> shot exposure
         :param f        #f
         """
-        self.kind = kind
-        self.path = path
+        super().__init__(kind, path, x)
         self.time = t
-        self.x = x
         self.f_number = f if f else 5.6
-
         self.im = None
-
-    def __repr__(self):
-        return f'<Img class instance> {self.kind}: {self.path} at {self.x}mm'
-
-    def __str__(self):
-        return f'Exp. {self.kind} at {self.x}mm'
 
     def _find_circle(self):
         if self.im is None:
@@ -101,6 +164,8 @@ class Img(object):
         # cv2.waitKey()
 
         # -------------------------------------circle detection-----------------------
+        # slider
+
         circles = []
         cannyHighEdgeThreshold = 100
         param2 = 100
@@ -141,22 +206,6 @@ class Img(object):
 
         return chosen_circle
 
-    def resize_im(self, scale_down_by):
-        """Scales down self.im
-        :param scale_down_by    int or float to divide both x and y by
-        """
-        output = None
-        scaled_h = np.round(self.im.shape[0] // scale_down_by).astype("int")
-        scaled_w  = np.round(self.im.shape[1] // scale_down_by).astype("int")
-        print('{} resized from {}x{} to: {}x{} '.format(
-            self.path,
-            self.im.shape[0],
-            self.im.shape[1],
-            scaled_h,
-            scaled_w))
-        im = np.ndarray(shape=(scaled_w, scaled_h))
-        self.im = cv2.resize(self.im, im.shape)
-
     def read_a(self):
         """Calculates CoC from horizontal image crossection at half for height
         :param im           numpy array image
@@ -169,29 +218,10 @@ class Img(object):
             x, y, r = circle
             return 2 * r
 
-    def load_image(self, dtype=None, color_mode=0):
-        """Read image files as numpy arrays using opencv python wrapper.
-        :param color_mode       1 - color, 0 - greyscale(default), -1 - unchanged
-        :param dtype            data type of returned numpy array (ex. np.float32)
-                                If any *float* type is used, convert to [0,1] range.
-                                If not given original is used.
-        :return                 numpy arrays of read image
-        """
-        im = cv2.imread(str(self.path), color_mode)
-        if im is None:
-            raise OSError('image {} load failed!'.format(self.path))
-        # search for normalization factor (max no. to divide by)
-        max_no = np.iinfo(im.dtype).max
-        if im.dtype != dtype:
-            im = np.asarray(im, dtype=dtype)
-        if max_no and im.dtype in [np.float16, np.float32, np.float64]:
-            im = im / max_no
-        self.im = im
-
-
 class SimulationImg(Img):
-    def __init__(self):
-        super.__init__()
+    """Stores simulation image and its methods"""
+    def __init__(self, kind, x, path):
+        super().__init__(kind, x, path)
 
     def read_a(self, threshold):
         """Calculates CoC from horizontal image crossection at half for height
@@ -218,7 +248,7 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         sys.exit('usage: img.py data_json data_dir')
 
-    data = ImgSet.load_from_json_factory(sys.argv[1], sys.argv[2])
+    data = ImgSet.load_experimental_dataset(sys.argv[1], sys.argv[2])
     img1 = data['maxwell'][0]
     img1.load_image()
     img1.resize_im(scale_down_by=4)
