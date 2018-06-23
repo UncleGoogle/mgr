@@ -34,14 +34,58 @@ def main():
 
     # -------------------------------------reading experimental data--------------
 
-    read_exp_data()
+    experimental_data = ImgSet.load_from_json_factory(args.data_json, args.exp)
+    # import ipdb; ipdb.set_trace();
+    data = filter(lambda img: img.kind == 'dot', experimental_data['maxwell'])
+    scale = 4
+    row = "{:<28} {:>5.3f}mm {:>6.0f}px"
+    for img in data:
+        img.load_image()
+        img.resize_im(scale_down_by=scale)
 
-    def read_exp_data():
-        data = ImgSet.load_from_json_factory(args.data_json, args.exp)
-        img1 = data[0][0]
-        img1.readImage()
-        img1.resize_im(divide_by=8)
-        print('circle diameter is: ', 8 * img1.read_a())
+        # -----------------------------Measure diameter from an image------------
+        a_px = img.read_a() * scale
+        print(row.format(f'{img.kind} at {img.x}:', a_px * sampling, a_px))
+
+        # -----------------------------Calculate CoC proportional sizes----------
+        proportions_a = pre_propostions_a * img.x
+        proportions_a_px = proportions_a // sampling
+        print(row.format('CoC (proportionally)', proportions_a, proportions_a_px))
+
+
+        # print(row.format('CoC to simulation:', proportions_a_px/a_px, 0))
+        # cv2.circle(im, (im.shape[0]//2, im.shape[1]//2-1), int(a_px//2), (255, 0, 0))
+
+        # print(f'Img {img} ---> read_a: {diameter}')
+
+    #     # commented out becase airy middle disk investigation is depracated
+    #     # airy_a = pre_airy_a * (f + x)
+    #     # airy_a_px = airy_a // sampling
+    #     # print(row.format('Airy first disk', airy_a, airy_a_px))
+
+    #     # -----------------------------Measure a from an image-------------------
+    #     a_px = read_a(im, threshold=threshold)
+    #     print(row.format(f'Simulation (treshhold={threshold})', a_px * sampling, a_px))
+    #     print(row.format('CoC to simulation:', proportions_a_px/a_px, 0))
+    #     # cv2.circle(im, (im.shape[0]//2, im.shape[1]//2-1), int(a_px//2), (255, 0, 0))
+    #     # cv2.imshow('image', im)
+    #     # cv2.waitKey(0)
+
+        # tries = 1
+        # while tries < 5:
+        #     diameter = img.read_a() * (scale ** tries)
+        #     if diameter > 0:
+        #         print(f'radius is {diameter} (image was resized {scale ** tries} times)')
+        #         break
+        #     print('No circle found. Scaling down by {}')
+        #     tries += 1
+        #     img.resize(scale_down_by=scale)
+
+
+    # img1 = data[0][0]
+    # img1.readImage()
+    # img1.resize_im(divide_by=8)
+    # print('circle diameter is: ', 8 * img1.read_a())
 
     # -------------------------------------reading images-------------------------
 

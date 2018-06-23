@@ -6,6 +6,8 @@ import pathlib
 import cv2
 import numpy as np
 
+from slider import cv2_slider
+
 
 class ImgSet(object):
     """keeps series of experimental images"""
@@ -46,7 +48,7 @@ class ImgSet(object):
         with open(json_path, 'r') as f:
             dataset = json.load(f)
 
-        img_sets = []
+        img_sets = {}
         for dataset_name in dataset:
             focus_reference = dataset[dataset_name]['focus_reference']
             dataset_path = data_path / dataset_name
@@ -55,12 +57,12 @@ class ImgSet(object):
                 im_path = dataset_path / ('_MG_' + str(i['name']) + '.JPG')
                 imgs.append(Img(i['kind'],
                                 im_path,
-                                focus_reference - i['x'],
+                                i['x'] - focus_reference,
                                 i['t'],
                                 i.get('f'),
                                ))
 
-            img_sets.append(cls(dataset_name, imgs, path=dataset_path))
+            img_sets[dataset_name] = cls(dataset_name, imgs, path=dataset_path)
         return img_sets
 
 
@@ -68,7 +70,7 @@ class Img(object):
     """represents a shot and image"""
     def __init__(self, kind, path, x, t, f):
         """
-        :param kind     ['img', 'dot', 'sym']
+        :param kind     ['img', 'dot']
         :param path     str or Path pointing to image file
         :param x        deblured distance (counting from the focal point)
         :param t        1 over time -> shot exposure
@@ -85,57 +87,75 @@ class Img(object):
     def __repr__(self):
         return f'<Img class instance> {self.kind}: {self.path} at {self.x}mm'
 
-    def _find_circle(self):
+    def __str__(self):
+        return f'Exp. {self.kind} at {self.x}mm'
 
+    def _find_circle(self):
         if self.im is None:
             raise RuntimeError('self.im not loaded my ladies')
 
-        # # -------------------------------------blur image---------------------------
-        # im = cv2.medianBlur(self,im, 5)
-        # cv2.imshow("output", im)
+        # -------------------------------------blur image-----------------------------
+        previous = self.im.copy()
+        im = cv2.medianBlur(self.im, 5)
+        # cv2.imshow("medianBlur", np.hstack([previous, self.im]))
         # cv2.waitKey()
 
-        output = self.im.copy()
+        # -------------------------------------circle detection-----------------------
+        circles = []
+        cannyHighEdgeThreshold = 100
+        param2 = 100
 
-        print(f'searching for circles...')
-        circles = cv2.HoughCircles(self.im,
-                                   cv2.HOUGH_GRADIENT,
-                                   dp=2,
-                                   minDist=4,
-                                   param1=100,
-                                   param2=100,
-                                   minRadius=5
-                                  )
+        while (cannyHighEdgeThreshold > 20):
+            print(f'Searching for circles... ', end='')
+            circles = cv2.HoughCircles(self.im, cv2.HOUGH_GRADIENT, dp=2, minDist=3,
+                                       param1=cannyHighEdgeThreshold, param2=param2,
+                                       minRadius=1)
 
-        if circles is None:
-            print('No circles found')
-            return
+            if circles is not None and circles[0][0][2] != 0:
+                break
 
-        print(f'found {len(circles)} circles')
+            cannyHighEdgeThreshold -= 5
+            print(f'No circles found. Changing high threshold of CED to {cannyHighEdgeThreshold}')
+
+        else:
+            cv2.imshow("No circles found", self.im)
+            cv2.waitKey()
+            return None
+
+        print(f'debug: row im show {circles}')
         circles = np.round(circles[0]).astype("int")
+        print(f'{len(circles)} circles found ')
 
-        # show matches for testing purposes
-        for (x, y, r) in circles:
-            cv2.circle(output, (x, y), r, (255, 255, 255), 1)
-            cv2.rectangle(output, (x - 5, y - 5), (x + 5, y + 5), (255, 255, 255), -1)
-            cv2.imshow("output", np.hstack([self.im, output]))
-            cv2.waitKey(0)
+        chosen_circle = None
+        while chosen_circle is None:
+            output = self.im.copy()
+            for i, (x, y, r) in enumerate(circles):
+                cv2.circle(output, (x, y), r, (255, 255, 255), 1)
+                cv2.rectangle(output, (x - 4, y - 4), (x + 4, y + 4), (255, 255, 255), -1)
+                cv2.putText(output, f"({x}, {y}), radius: {r}", (3, self.im.shape[0]-4), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1);
+                cv2.imshow("Preview board", output)
+                key = cv2.waitKey(0)
+                if key == 13:  # enter
+                    chosen_circle = circles[i]
+                    break
 
-        if circles.shape[0] != 1:
-            raise NotImplementedError("more than 1 circle are found")
+        return chosen_circle
 
-        return circles[0]
-
-    def resize_im(self, divide_by):
-        scaled_h = np.round(img1.im.shape[0] // divide_by).astype("int")
-        scaled_w  = np.round(img1.im.shape[1] // divide_by).astype("int")
-        print('resized from {}x{} to: {}x{} '.format(
-            img1.im.shape[0],
-            img1.im.shape[1],
+    def resize_im(self, scale_down_by):
+        """Scales down self.im
+        :param scale_down_by    int or float to divide both x and y by
+        """
+        output = None
+        scaled_h = np.round(self.im.shape[0] // scale_down_by).astype("int")
+        scaled_w  = np.round(self.im.shape[1] // scale_down_by).astype("int")
+        print('{} resized from {}x{} to: {}x{} '.format(
+            self.path,
+            self.im.shape[0],
+            self.im.shape[1],
             scaled_h,
             scaled_w))
         im = np.ndarray(shape=(scaled_w, scaled_h))
-        self.im = cv2.resize(img1.im, im.shape)
+        self.im = cv2.resize(self.im, im.shape)
 
     def read_a(self):
         """Calculates CoC from horizontal image crossection at half for height
@@ -149,7 +169,7 @@ class Img(object):
             x, y, r = circle
             return 2 * r
 
-    def readImage(self, dtype=None, color_mode=0):
+    def load_image(self, dtype=None, color_mode=0):
         """Read image files as numpy arrays using opencv python wrapper.
         :param color_mode       1 - color, 0 - greyscale(default), -1 - unchanged
         :param dtype            data type of returned numpy array (ex. np.float32)
@@ -192,15 +212,13 @@ class SimulationImg(Img):
 
 if __name__ == '__main__':
     """for testing purpose"""
+    print('running main in the img.py')
 
     import sys
     if len(sys.argv) < 2:
         sys.exit('usage: img.py data_json data_dir')
 
     data = ImgSet.load_from_json_factory(sys.argv[1], sys.argv[2])
-    img1 = data[0][0]
-    img1.readImage()
-    img1.resize_im(divide_by=8)
-    print('circle diameter is: ', img1.read_a())
-    img1.resize_im(divide_by=1/4)
-    print('circle diameter is: ', img1.read_a())
+    img1 = data['maxwell'][0]
+    img1.load_image()
+    img1.resize_im(scale_down_by=4)
