@@ -4,45 +4,32 @@ from functools import wraps
 import cv2
 
 
-def cv2_slider(slider):
-    """Slider docstring"""
+def cv2_slider(**sliders):
+    """
+    :param **sliders      attr1=max_val1, attr2=max_val2, ...
+    """
     def decorator(function):
         @wraps(function)  # to don't lose decorated function docsting and name
         def wrapper(*args, **kwargs):
-
             cv2.namedWindow('preview', cv2.WINDOW_NORMAL)  # resizable window
 
+            # cv2.createTrackbar('_', 'preview', 0, 100, nothing)  # cv2 bug workaround
             other_kwargs = {}
             slider_kwargs = {}
-            nothing = lambda _: None
             for key, value in kwargs.items():
-                if key == slider:
-                    try:
-                        cv2.createTrackbar(key, 'preview', value, 100, nothing)
-                        slider_kwargs[key] = value
-                    except TypeError as e:
-                        raise TypeError(f'wrong value for "{key}" in slider; ' + str(e))
+                if key in sliders:
+                    print(f'creating trackbar for {key}; initial tracker position: {value}')
+                    cv2.createTrackbar(key, 'preview', value, sliders[key], lambda _: None)
+                    slider_kwargs[key] = value
                 else:
                     other_kwargs[key] = value
-
-
-
-            # low_tresh = 10
-
-            # cv2.createTrackbar('_', 'preview', 0, 100, nothing)  # cv2 bug workaround
-            # cv2.createTrackbar(slider, 'preview', low_tresh, 100, nothing)
-            cv2.imshow('preview', im)
-
-            res = function(*args, **{**slider_kwargs, **other_kwargs})
 
             while True:
 
                 for key, value in slider_kwargs.items():
                     slider_kwargs[key] = cv2.getTrackbarPos(key, 'preview')
-                    print('updating tracker position to ', slider_kwargs[key])
-
+                    print(f'updating tracker: `{key}` position to {slider_kwargs[key]}')
                 res = function(*args, **{**slider_kwargs, **other_kwargs})
-
                 cv2.imshow('preview', res)
 
                 key = cv2.waitKey(1000)
@@ -60,16 +47,16 @@ if __name__ == "__main__":
     if im is None:
         raise OSError('image {} load failed!'.format(self.path))
 
-    @cv2_slider("gumiak")
-    def testSlider(name, other, gumiak=10):
+    @cv2_slider(radius=500, x=1000)
+    def testSlider(name, x, radius=10):
         """Original docsting"""
-        cv2.circle(im, (200, 200), radius, (255, 255, 255))
+        cv2.circle(im, (x, 500), radius, (255, 255, 255))
         return im
 
     radius = 50
     # cv2.imshow(im)
     # cv2.waitKey()
-    testSlider('TheName', other=3, gumiak=4)
+    testSlider('TheName', x=3, radius=4)
 
     # def auto_crop(self, margin):
     #     """Crops image leaving given margin from both side.
