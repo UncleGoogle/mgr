@@ -4,37 +4,46 @@ from functools import wraps
 import cv2
 
 
-def cv2_slider(**sliders):
+def cv2_slider(sl_window="Preview", **sliders):
+    """Decorator to make fast GUI sliders for any openCV func. that returns an image
+    :param sl_window        str with window name
+    :param **sliders        attr1=max_val1, attr2=max_val2, ...
     """
-    :param **sliders      attr1=max_val1, attr2=max_val2, ...
-    """
-    def decorator(function):
-        @wraps(function)  # to don't lose decorated function docsting and name
-        def wrapper(*args, **kwargs):
-            cv2.namedWindow('preview', cv2.WINDOW_NORMAL)  # resizable window
+    for key in sliders:
+        if type(sliders[key]) is not int:
+            raise TypeError(f"Integer expected, but `{key}` type is {type(sliders[key])}")
 
-            # cv2.createTrackbar('_', 'preview', 0, 100, nothing)  # cv2 bug workaround
+    def decorator(function):
+        @wraps(function)
+        def wrapper(*args, **kwargs):
+            cv2.namedWindow(sl_window, cv2.WINDOW_NORMAL)  # resizable window
+
             other_kwargs = {}
             slider_kwargs = {}
             for key, value in kwargs.items():
                 if key in sliders:
                     print(f'creating trackbar for {key}; initial tracker position: {value}')
-                    cv2.createTrackbar(key, 'preview', value, sliders[key], lambda _: None)
+                    cv2.createTrackbar(key, sl_window, value, sliders[key], lambda _: None)
                     slider_kwargs[key] = value
                 else:
                     other_kwargs[key] = value
 
+            prev = None
             while True:
 
                 for key, value in slider_kwargs.items():
-                    slider_kwargs[key] = cv2.getTrackbarPos(key, 'preview')
-                    print(f'updating tracker: `{key}` position to {slider_kwargs[key]}')
-                res = function(*args, **{**slider_kwargs, **other_kwargs})
-                cv2.imshow('preview', res)
+                    slider_kwargs[key] = cv2.getTrackbarPos(key, sl_window)
 
-                key = cv2.waitKey(1000)
+                if prev != slider_kwargs:
+                    print(f'updating view')
+                    res = function(*args, **{**slider_kwargs, **other_kwargs})
+                    cv2.imshow(sl_window, res)
+
+                key = cv2.waitKey(500)
                 if key == 27 or key == 13:
                     break
+
+                prev = slider_kwargs.copy()
 
         return wrapper
     return decorator
@@ -47,73 +56,24 @@ if __name__ == "__main__":
     if im is None:
         raise OSError('image {} load failed!'.format(self.path))
 
-    @cv2_slider(radius=500, x=1000)
-    def testSlider(name, x, radius=10):
+    x_max = im.shape[0]
+    y_max = im.shape[1]
+    radius_max = (im.shape[0] + im.shape[1]) // 2
+
+    @cv2_slider("Ladies & gentelmens! This is <=== Slider demo ===>",
+                radius=radius_max,
+                x=x_max,
+                y=y_max
+                )
+    def testSlider(name, x, y, radius=20):
         """Original docsting"""
-        cv2.circle(im, (x, 500), radius, (255, 255, 255))
+        cv2.circle(im, (x, y), radius, (255, 255, 255), 5)
         return im
 
     radius = 50
     # cv2.imshow(im)
     # cv2.waitKey()
-    testSlider('TheName', x=3, radius=4)
-
-    # def auto_crop(self, margin):
-    #     """Crops image leaving given margin from both side.
-    #     :param margin       how many pixels leave from each side of countured rect
-    #     """
-    #     cv2.namedWindow('preview', cv2.WINDOW_NORMAL)  # resizable window
-
-    #     im = cv2.GaussianBlur(self.im, (7,7), 0)
-
-    #     low_tresh = 10
-    #     high_tresh = 30
-    #     nothing = lambda _: None
-    #     cv2.createTrackbar('_', 'preview', 0, 100, nothing)
-    #     cv2.createTrackbar('low_tresh', 'preview', low_tresh, 100, nothing)
-    #     cv2.createTrackbar('high_tresh', 'preview', high_tresh, 200, nothing)
-
-    #     l, h = low_tresh, high_tresh
-    #     outdated = True
-    #     while True:
-    #         if outdated:
-    #             outdated = False
-    #             low_tresh, high_tresh = l, h
-    #             print('compute')
-    #             edges = cv2.Canny(im, low_tresh, high_tresh)
-    #             _, contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    #             # cv2.imshow('preview', edges)
-
-    #             area_max = 0
-    #             for c in contours:
-    #                 xx, yy, ww, hh = cv2.boundingRect(c)
-    #                 area = ww * hh
-    #                 if area > area_max:
-    #                     area_max = area
-    #                     x, y, w, h = xx, yy, ww, hh
-    #             if area_max == 0:
-    #                 raise RuntimeError('No conturs for crop found')
-
-    #             y_from = max(y - margin, 0)
-    #             x_from = max(x - margin, 0)
-    #             y_to = min(y + h + margin, self.im.shape[1])
-    #             x_to = min(x + w + margin, self.im.shape[0])
-    #             print(self.im.shape, y_from, x_from, 'to:', x_to, y_to)
-    #             cv2.rectangle(edges,(x_from,y_from),(x_from,x_to),(255,255,255),3)
-    #             cv2.imshow('preview', edges); cv2.waitKey()
-    #             cropped_im = im[y_from : y_to, x_from : x_to]
-
-    #         key = cv2.waitKey(300)
-    #         if key == 27 or key == 13:
-    #             break
-
-    #         l = cv2.getTrackbarPos('low_tresh', 'preview')
-    #         h = cv2.getTrackbarPos('high_tresh', 'preview')
-    #         outdated = (low_tresh, high_tresh) != (l, h)
-    #         print('outdated: {}'.format(outdated))
-
-
-    #     print(f'Image is cropped from {self.im.shape} to {cropped_im.shape}')
-    #     cv2.imshow('cropped_im', cropped_im); cv2.waitKey()
-    #     self.im = cropped_im
-    #     cv2.destroyAllWindows()
+    testSlider('TheName',
+                x=int(im.shape[0] // 5),
+                y=int(im.shape[1] // 4),
+                radius=20)
