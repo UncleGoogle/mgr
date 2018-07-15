@@ -164,53 +164,106 @@ class ExperimentalImg(Img):
         # cv2.waitKey()
 
         # -------------------------------------circle detection-----------------------
-        # slider
 
-        circles = []
-        cannyHighEdgeThreshold = 100
-        param2 = 100
+        # slider case ====================================
 
-        while (cannyHighEdgeThreshold > 20):
-            print(f'Searching for circles... ', end='')
-            circles = cv2.HoughCircles(self.im, cv2.HOUGH_GRADIENT, dp=2, minDist=3,
-                                       param1=cannyHighEdgeThreshold, param2=param2,
-                                       minRadius=1)
+        threshold_max = 200
+        param2_max = 200
+        dp_max = 5
+        minRadius_max = 50
+        minDist_max = 20
 
-            if circles is not None and circles[0][0][2] != 0:
-                break
+        @cv2_slider(param1=threshold_max, param2=param2_max, dp=dp_max, minRadius=minRadius_max, minDist=minDist_max)
+        def _CED_choser(im, **kwargs):
 
-            cannyHighEdgeThreshold -= 5
-            print(f'No circles found. Changing high threshold of CED to {cannyHighEdgeThreshold}')
+            for key in kwargs.keys():
+                if kwargs[key] < 1:
+                    kwargs[key] = 1
 
-        else:
-            cv2.imshow("No circles found", self.im)
-            cv2.waitKey()
-            return None
+            circles = cv2.HoughCircles(im,
+                                       cv2.HOUGH_GRADIENT,
+                                       **kwargs)
 
-        print(f'debug: row im show {circles}')
-        circles = np.round(circles[0]).astype("int")
-        print(f'{len(circles)} circles found ')
+            if circles is None or circles[0][0][2] != 0:
+                print("No circles found")
+                return im, None
 
-        chosen_circle = None
-        while chosen_circle is None:
-            output = self.im.copy()
+            print(f'debug: row im show {circles}')
+            circles = np.round(circles[0]).astype("int")
+            print(f'{len(circles)} circles found ')
+
             for i, (x, y, r) in enumerate(circles):
-                cv2.circle(output, (x, y), r, (255, 255, 255), 1)
-                cv2.rectangle(output, (x - 4, y - 4), (x + 4, y + 4), (255, 255, 255), -1)
-                cv2.putText(output, f"({x}, {y}), radius: {r}", (3, self.im.shape[0]-4), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1);
-                cv2.imshow("Preview board", output)
-                key = cv2.waitKey(0)
-                if key == 13:  # enter
-                    chosen_circle = circles[i]
-                    break
+                cv2.circle(im, (x, y), r, (255, 255, 255), 1)
+                cv2.rectangle(im, (x - 4, y - 4), (x + 4, y + 4), (255, 255, 255), -1)
+                cv2.putText(im, f"({x}, {y}), radius: {r}", (3, im.shape[0]-4*i), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1);
 
-        return chosen_circle
+            return im, circles
+
+        chosen_params, im, circles = _CED_choser(
+                self.im,
+                param1=100, # cannyHighEdgeThreshold
+                param2=100,
+                dp=2,
+                minRadius=4,
+                minDist=10
+                )
+
+        print(chosen_params, 'circles:', circles)
+
+        cv2.namedWindow('Chosen result', cv2.WINDOW_NORMAL)
+        cv2.imshow('Chosen result', chosen_params)
+        cv2.waitKey(0)
+
+        return circles[0]
+
+        # slider case ==================================== end
+
+        # circles = []
+        # cannyHighEdgeThreshold = 100
+        # param2 = 100
+
+        # while (cannyHighEdgeThreshold > 20):
+        #     print(f'Searching for circles... ', end='')
+        #     circles = cv2.HoughCircles(self.im, cv2.HOUGH_GRADIENT, dp=2, minDist=3,
+        #                                param1=cannyHighEdgeThreshold, param2=param2,
+        #                                minRadius=1)
+
+        #     if circles is not None and circles[0][0][2] != 0:
+        #         break
+
+        #     cannyHighEdgeThreshold -= 5
+        #     print(f'No circles found. Changing high threshold of CED to {cannyHighEdgeThreshold}')
+
+        # else:
+        #     cv2.imshow("No circles found", self.im)
+        #     cv2.waitKey()
+        #     return None
+
+        # print(f'debug: row im show {circles}')
+        # circles = np.round(circles[0]).astype("int")
+        # print(f'{len(circles)} circles found ')
+
+        # chosen_circle = None
+        # while chosen_circle is None:
+        #     output = self.im.copy()
+        #     for i, (x, y, r) in enumerate(circles):
+        #         cv2.circle(output, (x, y), r, (255, 255, 255), 1)
+        #         cv2.rectangle(output, (x - 4, y - 4), (x + 4, y + 4), (255, 255, 255), -1)
+        #         cv2.putText(output, f"({x}, {y}), radius: {r}", (3, self.im.shape[0]-4), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1);
+        #         cv2.imshow("Preview board", output)
+        #         key = cv2.waitKey(0)
+        #         if key == 13:  # enter
+        #             chosen_circle = circles[i]
+        #             break
+
+        # return chosen_circle
 
     def read_a(self):
         """Calculates CoC from horizontal image crossection at half for height
         :param im           numpy array image
         :return             diameter of middle maximum or -1 if circle not found
         """
+        # watershed = self._watershed(cv2.Sobel(self.im, .. .. . )) TODO
         circle = self._find_circle()
         if circle is None:
             return -1

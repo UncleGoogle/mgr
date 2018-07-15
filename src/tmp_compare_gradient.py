@@ -51,24 +51,14 @@ def main():
     data = filter(lambda img: img.kind == 'dot', experimental_data['maxwell'])
     scale = 2
 
-    img = list(data)[8]
+    win = 'preview'
+
+    img = list(data)[3]  # 6mm from the focal point
     img.load_image()
     img.resize_im(scale_down_by=scale)
+    cv2.namedWindow(win, cv2.WINDOW_NORMAL)
 
-    thresh_max = 255
-    method_max = 16
-
-    @cv2_slider(method=method_max, threshold=thresh_max)
-    def choose_binnary_threshold(im, method, threshold):
-        ret, res = cv2.threshold(im, threshold, thresh_max, method)
-        return res
-
-    @cv2_slider(maxVal=50, minVal=50)
-    def choose_canny_edge(im, maxVal, minVal):
-        res = cv2.Canny(img.im, minVal, maxVal)
-        return res
-
-    @cv2_slider(ksize=7)
+    @cv2_slider('slider', ksize=7)
     def gradient(im, ksize):
         if ksize < 1:
             ksize = 1
@@ -79,9 +69,9 @@ def main():
         sobelx64f = cv2.Sobel(im, cv2.CV_64F, 1, 1, ksize=ksize)
         abs_sobel64f = np.absolute(sobelx64f)
         sobel_8u = np.uint8(abs_sobel64f)
-        return sobel_8u, ksize
+        return ksize, sobel_8u
 
-    @cv2_slider(ksize=31)
+    @cv2_slider('slider', ksize=31)
     def gradient_laplacian(im, ksize):
         if ksize < 1:
             ksize = 1
@@ -92,19 +82,12 @@ def main():
         lapl = cv2.Laplacian(im, cv2.CV_64F, ksize=ksize)
         abs = np.absolute(lapl)
         lapl_8u = np.uint8(abs)
-        return lapl_8u, ksize
+        return ksize, lapl_8u
 
-    ret, res, _ = choose_binnary_threshold(img.im, method=cv2.THRESH_BINARY, threshold=10)
-    print('threshold:', ret)
-    img.im = res
+    chosen_ksize, res = gradient_laplacian(img.im, ksize=3)
 
-
-    # ret, res, ksize = gradient(res, ksize=5)
-    # messy results (many edges inside a circle)
-    # chosen_params, res, _ = choose_canny_edge(res, minVal=10, maxVal=20)
-    # print('chosen:', chosen_params)
-
-    print('read a: ', img.read_a())
+    cv2.imshow(win, res)
+    cv2.waitKey()
 
 #     for img in data:
 #         img.load_image()
