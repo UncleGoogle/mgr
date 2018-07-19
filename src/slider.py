@@ -1,5 +1,7 @@
 """ slider decorator for openCV image display """
 from functools import wraps
+from pathlib import PurePath
+import numpy as np
 
 import cv2
 
@@ -17,16 +19,32 @@ def cv2_slider(win="Preview", **sliders):
 
     def decorator(function):
 
+        def _find_im(output, func):
+            if type(output) is np.ndarray and output.ndim == 2:
+                return output
+            else:
+                try:
+                    iter(output)
+                except TypeError:
+                    raise TypeError(f'Image for slider not found. Return output image or iterable with that image in the {func.__name__}.')
+                else:
+                    for i in output:
+                        if type(i) is np.ndarray and i.ndim == 2:
+                            print('Numpy image found in callback')
+                            return i
+                    else:
+                        raise TypeError(f'Add output image as callback in the decorated funtion.')
+
         @wraps(function)
         def wrapper(im, *args, **kwargs):
-            """ATTENTION: im is openCV (numpy) image to pass its clone every refresh"""
+            if type(im) is not np.ndarray:
+                raise TypeError('First argument is not numpy image')
 
             cv2.namedWindow(win, cv2.WINDOW_NORMAL)  # resizable window
 
             other_kwargs = {}
             slider_kwargs = {}
 
-            # TODO use inspect.getatrspec(function) instead to get defaults from func definition
             for key, value in kwargs.items():
                 if key in sliders:
                     print(f'creating trackbar for {key}; initial tracker position: {value}')
@@ -38,22 +56,21 @@ def cv2_slider(win="Preview", **sliders):
             prev = None
             rest = None
             while True:
-
-                for key, value in slider_kwargs.items():
+                for key in slider_kwargs.keys():
                     slider_kwargs[key] = cv2.getTrackbarPos(key, win)
 
                 if prev != slider_kwargs:
-                    res = function(im.copy(), *args, **{**slider_kwargs, **other_kwargs})
-                    if type(res) == tuple and len(res) > 1:
-                        res_im, *rest = res
-                    else:
-                        res_im = res
+                    result = function(im.copy(), *args, **{**slider_kwargs, **other_kwargs})
+                    res_im = _find_im(result, function)
                     cv2.imshow(win, res_im)
 
                 key = cv2.waitKey(300)
                 if key == 13:  # enter
                     cv2.destroyWindow(win)
-                    return (slider_kwargs, res_im, rest)
+                    name = PurePath('.') / 'slider_results' / (str(function.__name__) + str(slider_kwargs) + '.png')
+                    print('tries to write file:', str(name))
+                    cv2.imwrite(str(name), res_im)
+                    return result
                 prev = slider_kwargs.copy()
 
         return wrapper
