@@ -1,15 +1,10 @@
-import sys
 import cv2
 import argparse
-import pathlib
-import os
 import datetime
 
 import numpy as np
 
-from helpers.readImage import readImage
 from img import ExperimentalImg, SimulationImg, ImgSet
-
 from slider import cv2_slider
 
 
