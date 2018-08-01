@@ -3,6 +3,8 @@ import cv2
 import argparse
 import pathlib
 import os
+import datetime
+
 import numpy as np
 
 from helpers.readImage import readImage
@@ -14,17 +16,17 @@ from slider import cv2_slider
 thresh_max = 255
 method_max = 16
 @cv2_slider(method=method_max, threshold=thresh_max)
-def binary_threshold(im, method, threshold):
+def binary_threshold(im, method, threshold, slider=True):
     ret, res = cv2.threshold(im, threshold, thresh_max, method)
     return res, ret
 
 @cv2_slider(maxVal=50, minVal=50)
-def canny_edge(im, maxVal, minVal):
+def canny_edge(im, maxVal, minVal, slider=True):
     res = cv2.Canny(img.im, minVal, maxVal)
     return res
 
 @cv2_slider(ksize=7)
-def gradient_sobel(im, ksize):
+def gradient_sobel(im, ksize, slider=True):
     if ksize < 1:
         ksize = 1
     elif ksize % 2 == 0:
@@ -35,7 +37,7 @@ def gradient_sobel(im, ksize):
     return sobel_8u, ksize
 
 @cv2_slider(ksize=31)
-def gradient_laplacian(im, ksize):
+def gradient_laplacian(im, ksize, slider=True):
     ksize += (ksize + 1) % 2
     lapl = cv2.Laplacian(im, cv2.CV_64F, ksize=ksize)
     abs = np.absolute(lapl)
@@ -43,11 +45,10 @@ def gradient_laplacian(im, ksize):
     return lapl_8u, ksize
 
 @cv2_slider(ksize=11)
-def opening(im, ksize):
+def opening(im, ksize, slider=True):
     ksize += (ksize + 1) % 2
     kernel = np.ones((ksize,ksize), np.uint8)
     return cv2.morphologyEx(im, cv2.MORPH_OPEN, kernel)
-
 
 def main():
     # -------------------------------------Parsing script argments----------------
@@ -68,114 +69,74 @@ def main():
     px_camera_size = 0.001 * 4.29  # EOS 650D sensor pixel size in mm
 
     pre_propostions_a  = r / f
-    row = "{:<28} {:>6.0f}px {:>5.3f}mm"
+    row = "{:<28}\t{:>6.0f}px\t{:>5.3f}mm"
+
+    log_name = datetime.datetime.now()
 
     # -------------------------------------reading data---------------------------
     simulation_data = ImgSet.load_simulation_dataset(args.simulationDir, "Airy simulation")
     experimental_data = ImgSet.load_experimental_dataset(args.expJson, args.experimentalDir)
 
+    for img in experimental_data['maxwell']:
+        if img.kind != 'dot':
+            continue
+
     # -------------------------------------chosing x for investigation------------
-    x = 26  # mm
-    sim = simulation_data.get_dot_for_x(x)
-    img = experimental_data['maxwell'].get_dot_for_x(x)  # maxwell is just dataset name
+        try:
+            sim = simulation_data.get_dot_for_x(img.x)
+        except IndexError:
+            around = int(img.x * 0.1)
+            smallest_diff = 100000
+            for s in simulation_data:
+                if s.kind != 'dot':
+                    continue
+                diff = abs(s.x - img.x)
+                if diff <= around and diff < smallest_diff:
+                    smallest_diff = diff
+                    sim = s
+            print(f'No simulation data for +/- {around} around experimental distance {img.x}. Skipping...')
+            continue
 
-    # -------------------------------------CoC size from proportions--------------
-    proportions_a = r / f * x
-    print(row.format('CoC (proportionally)', 0.0, proportions_a))
+        print(f'experiment: {sim.x}, simulation: {sim.x}')
 
-    # -------------------------------------loading simulations--------------------
-    sim.load_image()
+        # -------------------------------------CoC size from proportions--------------
+        proportions_a = r / f * img.x
 
-    threshold = 8  # simple cutoff for pixels for simulation
-    a_px = sim.read_a(threshold=threshold)
-    a = a_px * sampling
-    print(row.format(f'{sim}', a_px, a))
+        # -------------------------------------loading simulations--------------------
+        sim.load_image()
 
-    # -------------------------------------loading and processing experimental----
-    img.load_image()
-    scale = 2
-    img.resize_im(scale_down_by=scale)
+        threshold = 8  # simple cutoff for pixels for simulation
+        a_px_sim = sim.read_a(threshold=threshold)
+        a_sim = a_px_sim * sampling
 
-    # interactive sliders to choose proper parameters -- see saved images
-    img.im = cv2.medianBlur(img.im, ksize=5)
-    img.im, _ = binary_threshold(img.im, method=cv2.THRESH_BINARY, threshold=10)
-    img.im = opening(img.im, ksize=5)
-    img.im, _ = gradient_sobel(img.im, ksize=7)
+        # -------------------------------------loading and processing experimental----
+        img.load_image()
+        scale = 2
+        img.resize_im(scale_down_by=scale)
 
-    a_px = img.read_a()
-    a = a_px * scale * px_camera_size
-    print(row.format(f'{img}', a_px, a))
+        # sliders
+        imp = cv2.medianBlur(img.im, ksize=5)
+        imp, _ = binary_threshold(imp, method=cv2.THRESH_BINARY, threshold=7, slider=False)
+        imp = opening(imp, ksize=7, slider=False)
+        imp, _ = gradient_sobel(imp, ksize=3, slider=False)
 
-    # -------------------------------------processing exp data--------------------
+        a_px = img.read_a(imp)
+        a = a_px * scale * px_camera_size
 
-#     data = [img for img in experimental_data['maxwell'] if img.kind=='dot']
-#     for img in data:
-#         img.load_image()
-#         img.resize_im(scale_down_by=scale)
+        # -------------------------------------write output---------------------------
 
-#         # -----------------------------Measure diameter from an image------------
-#         a_px = img.read_a() * scale
-#         print(row.format(f'{img.kind} at {img.x}:', a_px * sampling, a_px))
+        print(row.format('CoC (proportionally)', 0.0, proportions_a))
+        print(row.format(f'{sim}', a_px_sim, a_sim))
+        print(row.format(f'{img}', a_px, a))
 
-#         # -----------------------------Calculate CoC proportional sizes----------
-#         proportions_a = pre_propostions_a * img.x
-#         proportions_a_px = proportions_a // sampling
-#         print(row.format('CoC (proportionally)', proportions_a, proportions_a_px))
+        with open(f'./output_compare/{log_name}', 'a+') as out_log:
+            out_log.write(row.format('CoC (proportionally)', 0.0, proportions_a))
+            out_log.write('\n')
+            out_log.write(row.format(f'{sim}', a_px_sim, a_sim))
+            out_log.write('\n')
+            out_log.write(row.format(f'{img}', a_px, a))
+            out_log.write('\n\n')
 
-
-
-
-
-
-        # print(row.format('CoC to simulation:', proportions_a_px/a_px, 0))
-        # cv2.circle(im, (im.shape[0]//2, im.shape[1]//2-1), int(a_px//2), (255, 0, 0))
-
-        # print(f'Img {img} ---> read_a: {diameter}')
-
-    #     # commented out becase airy middle disk investigation is depracated
-    #     # airy_a = pre_airy_a * (f + x)
-    #     # airy_a_px = airy_a // sampling
-    #     # print(row.format('Airy first disk', airy_a, airy_a_px))
-
-    #     # -----------------------------Measure a from an image-------------------
-    #     a_px = read_a(im, threshold=threshold)
-    #     print(row.format(f'Simulation (treshhold={threshold})', a_px * sampling, a_px))
-    #     print(row.format('CoC to simulation:', proportions_a_px/a_px, 0))
-    #     # cv2.circle(im, (im.shape[0]//2, im.shape[1]//2-1), int(a_px//2), (255, 0, 0))
-    #     # cv2.imshow('image', im)
-    #     # cv2.waitKey(0)
-
-    # img1 = data[0][0]
-    # img1.readImage()
-    # img1.resize_im(divide_by=8)
-    # print('circle diameter is: ', 8 * img1.read_a())
-
-    # -------------------------------------reading images-------------------------
-
-    # for p in pathlib.Path(args.inputDir).iterdir():
-    #     if not (p.is_file() and p.suffix == '.bmp' or p.suffix == ".JPG"):
-    #         continue
-
-    #     # im = cv2.imread(str(p.absolute()), 0)
-    #     im = readImage(str(p.absolute()))
-
-    #     # -----------------------------Reading x from image filename-------------
-    #     x = int(p.stem.split('_')[-1])
-    #     print(f'------- x = {x} -------')
-
-    #     # -----------------------------Calculate theoretical sizes---------------
-    #     row = "{:<28} {:>5.3f}mm {:>6.0f}px"
-    #     proportions_a = pre_propostions_a * x
-    #     proportions_a_px = proportions_a // sampling
-    #     print(row.format('CoC (proportionally)', proportions_a, proportions_a_px))
-
-    #     # -----------------------------Measure a from an image-------------------
-    #     a_px = read_a(im, threshold=threshold)
-    #     print(row.format(f'Simulation (treshhold={threshold})', a_px * sampling, a_px))
-    #     print(row.format('CoC to simulation:', proportions_a_px/a_px, 0))
-    #     # cv2.circle(im, (im.shape[0]//2, im.shape[1]//2-1), int(a_px//2), (255, 0, 0))
-    #     # cv2.imshow('image', im)
-    #     # cv2.waitKey(0)
 
 if __name__ == '__main__':
     main()

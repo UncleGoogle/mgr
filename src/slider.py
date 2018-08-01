@@ -40,6 +40,12 @@ def cv2_slider(win="Preview", **sliders):
             if type(im) is not np.ndarray:
                 raise TypeError('First argument is not numpy image')
 
+            # skip slider functionality if slider=False found
+            for k, v in kwargs.items():
+                if k == 'slider' and v == False:
+                    return function(im.copy(), *args, **kwargs)
+
+
             cv2.namedWindow(win, cv2.WINDOW_NORMAL)  # resizable window
 
             other_kwargs = {}
@@ -47,7 +53,7 @@ def cv2_slider(win="Preview", **sliders):
 
             for key, value in kwargs.items():
                 if key in sliders:
-                    print(f'creating trackbar for {key}; initial tracker position: {value}')
+                    # print(f'creating trackbar for {key}; initial tracker position: {value}')
                     cv2.createTrackbar(key, win, value, sliders[key], lambda _: None)
                     slider_kwargs[key] = value
                 else:
@@ -68,7 +74,7 @@ def cv2_slider(win="Preview", **sliders):
                 if key == 13:  # enter
                     cv2.destroyWindow(win)
                     name = PurePath('.') / 'slider_results' / (str(function.__name__) + str(slider_kwargs) + '.png')
-                    print('tries to write file:', str(name))
+                    print('writing slider output to:', str(name))
                     cv2.imwrite(str(name), res_im)
                     return result
                 prev = slider_kwargs.copy()

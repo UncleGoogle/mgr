@@ -12,6 +12,7 @@ from slider import cv2_slider
 from statistics import timeit
 
 
+
 class ImgSet(object):
     """Keeps series of images with common origin"""
 
@@ -161,26 +162,21 @@ class ExperimentalImg(Img):
         self.f_number = f if f else 5.6
         self.im = None
 
-    def _find_circle(self):
-        if self.im is None:
-            raise RuntimeError('self.im not loaded my ladies')
-
+    @staticmethod
+    def _find_circle(im):
         threshold_max = 200
         param2_max = 200
         dp_max = 5
         minRadius_max = 50
         minDist_max = 20
 
-        @cv2_slider(param1=threshold_max, param2=param2_max, dp=dp_max, minRadius=minRadius_max, minDist=minDist_max)
+        @cv2_slider(param1=threshold_max, param2=param2_max, dp=dp_max)
         def _CED_choser(im, **kwargs):
             for key in kwargs.keys():
                 if kwargs[key] < 1:
                     kwargs[key] = 1
-            circles = cv2.HoughCircles(im,
-                    cv2.HOUGH_GRADIENT,
-                    **kwargs)
+            circles = cv2.HoughCircles(im, cv2.HOUGH_GRADIENT, **kwargs)
             if circles is None or circles[0][0][2] == 0:
-                print("No circles found")
                 return im, None
             circles = np.round(circles[0]).astype("int")
             print(f'{len(circles)} circles found:\n{circles}')
@@ -189,32 +185,21 @@ class ExperimentalImg(Img):
                 cv2.rectangle(im, (x - 2, y - 2), (x + 2, y + 2), (255, 255, 255), -1)
                 cv2.putText(im, f"({x}, {y}), radius: {r}",
                         (3, im.shape[0]-20*i), cv2.FONT_HERSHEY_PLAIN,
-                        2, (255,255,255), 1);
-
+                        3, (255,255,255), 1);
             return im, circles
 
-        im, circles = _CED_choser(self.im,
-                                  dp=2,
-                                  minDist=3,
-                                  param1=100, # cannyHighEdgeThreshold
-                                  param2=100,
-                                  minRadius=1,
-                                  )
-
-        print('circles:', circles)
+        im, circles = _CED_choser(im,
+                                dp=2,
+                                minDist=3,
+                                param1=100, # cannyHighEdgeThreshold
+                                param2=45,
+                                minRadius=1,
+                                )
         if circles is None:
             return None
-
         chosen_circle = circles[0]
-
-        win = cv2.namedWindow('Chosen result', cv2.WINDOW_NORMAL)
-        demo = self.im.copy()
-        x, y, r = chosen_circle
-        cv2.circle(demo, (x, y), r, (255, 255, 255), 1)
-        cv2.imshow(win, demo)
-        cv2.waitKey(0)
-
         return chosen_circle
+
 
     def _find_circle_old(self):
         if self.im is None:
@@ -266,16 +251,22 @@ class ExperimentalImg(Img):
 
         return chosen_circle
 
-    def read_a(self):
+    def read_a(self, im):
         """Calculates CoC from horizontal image crossection at half for height
         :param im           numpy array image
         :return             diameter of middle maximum or -1 if circle not found
         """
-        circle = self._find_circle()
+        circle = self._find_circle(im)
         if circle is None:
             return -1
         else:
             x, y, r = circle
+            win = cv2.namedWindow('Result')
+            demo = self.im.copy()
+            cv2.circle(demo, (x, y), r, (255, 255, 255), 1)
+            cv2.imshow(win, demo)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
             return 2 * r
 
 class SimulationImg(Img):
