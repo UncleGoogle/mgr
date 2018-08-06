@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import json
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -30,11 +31,6 @@ for sim in simulation_data:
     a_sim = a_px_sim * sampling
     mapping_sim[sim.x] = a_sim
 
-# toshow = sim.im.copy()
-# cv2.circle(toshow, (4096, 4096), a_px_sim//2, (255, 255, 255), 40)
-# plt.imshow(toshow)
-# plt.show()
-
 x_sim, y_sim = zip(*sorted(mapping_sim.items()))
 x_sim = np.array(x_sim)
 
@@ -55,6 +51,8 @@ plt.legend()
 plt.show()
 
 log_name = datetime.datetime.now()
+
+output_json = {'m': m, 'b': b, 'experimental_data': mapping_sim}
 with open(f'./output_mapping/mapping_{log_name}', 'w') as out_file:
-    out_file.write(str(mapping_sim))
+    json.dump(output_json, out_file, indent=4)
 

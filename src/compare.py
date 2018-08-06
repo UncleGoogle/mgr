@@ -8,18 +8,6 @@ from img import ExperimentalImg, SimulationImg, ImgSet
 from slider import cv2_slider
 
 
-thresh_max = 255
-method_max = 16
-@cv2_slider(method=method_max, threshold=thresh_max)
-def binary_threshold(im, method, threshold, slider=True):
-    ret, res = cv2.threshold(im, threshold, thresh_max, method)
-    return res, ret
-
-@cv2_slider(maxVal=50, minVal=50)
-def canny_edge(im, maxVal, minVal, slider=True):
-    res = cv2.Canny(img.im, minVal, maxVal)
-    return res
-
 @cv2_slider(ksize=7)
 def gradient_sobel(im, ksize, slider=True):
     if ksize < 1:
@@ -39,16 +27,7 @@ def gradient_laplacian(im, ksize, slider=True):
     lapl_8u = np.uint8(abs)
     return lapl_8u, ksize
 
-@cv2_slider(ksize=11)
-def opening(im, ksize, slider=True):
-    ksize += (ksize + 1) % 2
-    kernel = np.ones((ksize,ksize), np.uint8)
-    return cv2.morphologyEx(im, cv2.MORPH_OPEN, kernel)
-
 # sliders usage
-# imp = cv2.medianBlur(imp, ksize=5)
-# imp, _ = binary_threshold(imp, method=cv2.THRESH_BINARY, threshold=7, slider=False)
-# imp = opening(imp, ksize=7, slider=False)
 # imp, _ = gradient_sobel(imp, ksize=3, slider=True)
 
 
@@ -79,6 +58,8 @@ def main():
     simulation_data = ImgSet.load_simulation_dataset(args.simulationDir, "Airy simulation")
     experimental_data = ImgSet.load_experimental_dataset(args.expJson, args.experimentalDir)
 
+    exp_results = []
+    sim_results = []
     for img in experimental_data['maxwell']:
         if img.kind != 'dot':
             continue
@@ -116,10 +97,14 @@ def main():
         scale = 2
         img.resize_im(scale_down_by=scale)
 
+        # read diameter of the spot by fitting circle
         a_px = img.read_a()
         a = a_px * scale * px_camera_size
 
         # -------------------------------------write output---------------------------
+
+        exp_results.append(a_sim)
+        sim_results.append(a)
 
         print(row.format('CoC (proportionally)', 0.0, proportions_a))
         print(row.format(f'{sim}', a_px_sim, a_sim))
@@ -132,6 +117,17 @@ def main():
             out_log.write('\n')
             out_log.write(row.format(f'{img}', a_px, a))
             out_log.write('\n\n')
+
+    # -------------------------------------put on a plot-------------------------
+    x_mock = np.array([0, x_sim[-1]])
+    plt.plot(x_mock, d/f*x_mock, 'g-', label=f'Incoherent light (CoC proportionally: a=r*x/f)', linewidth=1, markersize=0)
+    plt.plot(x_sim, y_sim, 'rx--', label=f'Coherent light - simulations (threshold: {threshold}/255)', linewidth=0, markersize=6)
+    plt.plot(x_sim, float(m)*x_sim + b, 'r--', label='Fitted line(simulations)')
+    plt.title('CoC radius size along displacement for bigger lens')
+    plt.xlabel('distance from focal point, x [mm]')
+    plt.ylabel('spot radius, a [mm]')
+    plt.legend()
+    plt.show()
 
 
 if __name__ == '__main__':
