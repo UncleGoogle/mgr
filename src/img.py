@@ -175,10 +175,14 @@ class ExperimentalImg(Img):
             for key in kwargs.keys():
                 if kwargs[key] < 1:
                     kwargs[key] = 1
+
             # only im will be visible for user
             im_mod = cv2.medianBlur(im, ksize=5)
             _, im_mod = cv2.threshold(im_mod, bin_thresh, 255, cv2.THRESH_BINARY)
             im_mod = cv2.morphologyEx(im_mod, cv2.MORPH_OPEN, np.ones((7,7), np.uint8))
+
+            im = cv2.bitwise_and(im, im, mask=im_mod)
+
             circles = cv2.HoughCircles(im_mod, cv2.HOUGH_GRADIENT, **kwargs)
             if circles is None or circles[0][0][2] == 0:
                 return im, None
