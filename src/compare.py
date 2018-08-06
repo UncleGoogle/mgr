@@ -45,6 +45,13 @@ def opening(im, ksize, slider=True):
     kernel = np.ones((ksize,ksize), np.uint8)
     return cv2.morphologyEx(im, cv2.MORPH_OPEN, kernel)
 
+# sliders usage
+# imp = cv2.medianBlur(imp, ksize=5)
+# imp, _ = binary_threshold(imp, method=cv2.THRESH_BINARY, threshold=7, slider=False)
+# imp = opening(imp, ksize=7, slider=False)
+# imp, _ = gradient_sobel(imp, ksize=3, slider=True)
+
+
 def main():
     # -------------------------------------Parsing script argments----------------
     parser = argparse.ArgumentParser()
@@ -57,7 +64,7 @@ def main():
     # -------------------------------------Settings-------------------------------
     # in milimeters
     wl = 0.00628
-    f = 50
+    f = 250
     r = 27.75
     d = 2*r
     sampling = 0.001 * 1  # mm to px ratio
@@ -76,7 +83,7 @@ def main():
         if img.kind != 'dot':
             continue
 
-    # -------------------------------------chosing x for investigation------------
+        # -------------------------------------chosing x for investigation------------
         try:
             sim = simulation_data.get_dot_for_x(img.x)
         except IndexError:
@@ -95,7 +102,7 @@ def main():
         print(f'experiment: {sim.x}, simulation: {sim.x}')
 
         # -------------------------------------CoC size from proportions--------------
-        proportions_a = r / f * img.x
+        proportions_a = d / f * img.x
 
         # -------------------------------------loading simulations--------------------
         sim.load_image()
@@ -109,13 +116,7 @@ def main():
         scale = 2
         img.resize_im(scale_down_by=scale)
 
-        # sliders
-        imp = cv2.medianBlur(img.im, ksize=5)
-        imp, _ = binary_threshold(imp, method=cv2.THRESH_BINARY, threshold=7, slider=False)
-        imp = opening(imp, ksize=7, slider=False)
-        imp, _ = gradient_sobel(imp, ksize=3, slider=False)
-
-        a_px = img.read_a(imp)
+        a_px = img.read_a()
         a = a_px * scale * px_camera_size
 
         # -------------------------------------write output---------------------------

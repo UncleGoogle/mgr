@@ -6,13 +6,17 @@ import numpy as np
 import cv2
 
 
-def cv2_slider(win="Preview", **sliders):
+def cv2_slider(win="Preview", verbose=False, **sliders):
     """Decorator to make fast-prototype GUI sliders for any openCV func. that 
     returns an image. Minimum slider values are always 0.
     ATTENTION: you have to define opencv image in the wrapped function as first arg
     :param win                 str with window name
     :param **sliders           attr1=max_val1, attr2=max_val2, ...
     """
+    def print_verbose(verbose, msg):
+        if verbose:
+            print(msg)
+
     for key in sliders:
         if type(sliders[key]) is not int:
             raise TypeError(f"Integer expected, but `{key}` type is {type(sliders[key])}")
@@ -30,7 +34,7 @@ def cv2_slider(win="Preview", **sliders):
                 else:
                     for i in output:
                         if type(i) is np.ndarray and i.ndim == 2:
-                            print('Numpy image found in callback')
+                            print_verbose(verbose, 'Numpy image found in callback')
                             return i
                     else:
                         raise TypeError(f'Add output image as callback in the decorated funtion.')
@@ -43,7 +47,7 @@ def cv2_slider(win="Preview", **sliders):
             # skip slider functionality if slider=False found
             for k, v in kwargs.items():
                 if k == 'slider' and v == False:
-                    return function(im.copy(), *args, **kwargs)
+                    return function(im, *args, **kwargs)
 
 
             cv2.namedWindow(win, cv2.WINDOW_NORMAL)  # resizable window
@@ -52,15 +56,15 @@ def cv2_slider(win="Preview", **sliders):
             slider_kwargs = {}
 
             for key, value in kwargs.items():
+
                 if key in sliders:
-                    # print(f'creating trackbar for {key}; initial tracker position: {value}')
+                    print_verbose(verbose, f'creating trackbar for {key}; initial tracker position: {value}')
                     cv2.createTrackbar(key, win, value, sliders[key], lambda _: None)
                     slider_kwargs[key] = value
                 else:
                     other_kwargs[key] = value
 
             prev = None
-            rest = None
             while True:
                 for key in slider_kwargs.keys():
                     slider_kwargs[key] = cv2.getTrackbarPos(key, win)
@@ -74,13 +78,18 @@ def cv2_slider(win="Preview", **sliders):
                 if key == 13:  # enter
                     cv2.destroyWindow(win)
                     name = PurePath('.') / 'slider_results' / (str(function.__name__) + str(slider_kwargs) + '.png')
-                    print('writing slider output to:', str(name))
+                    print_verbose('writing slider output to:', str(name))
                     cv2.imwrite(str(name), res_im)
                     return result
                 prev = slider_kwargs.copy()
 
         return wrapper
     return decorator
+
+
+def mpl_slider():
+    """matplotlib version"""
+    pass
 
 
 if __name__ == "__main__":

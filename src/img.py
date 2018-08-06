@@ -162,24 +162,27 @@ class ExperimentalImg(Img):
         self.f_number = f if f else 5.6
         self.im = None
 
-    @staticmethod
-    def _find_circle(im):
-        threshold_max = 200
+    def _find_circle(self):
+
         param2_max = 200
         dp_max = 5
         minRadius_max = 50
         minDist_max = 20
+        bin_thresh_max = 255
 
-        @cv2_slider(param1=threshold_max, param2=param2_max, dp=dp_max)
-        def _CED_choser(im, **kwargs):
+        @cv2_slider(param2=param2_max, dp=dp_max, bin_thresh=bin_thresh_max)
+        def interactive_circle_finder(im, bin_thresh=10, **kwargs):
             for key in kwargs.keys():
                 if kwargs[key] < 1:
                     kwargs[key] = 1
-            circles = cv2.HoughCircles(im, cv2.HOUGH_GRADIENT, **kwargs)
+            # only im will be visible for user
+            im_mod = cv2.medianBlur(im, ksize=5)
+            _, im_mod = cv2.threshold(im_mod, bin_thresh, 255, cv2.THRESH_BINARY)
+            im_mod = cv2.morphologyEx(im_mod, cv2.MORPH_OPEN, np.ones((7,7), np.uint8))
+            circles = cv2.HoughCircles(im_mod, cv2.HOUGH_GRADIENT, **kwargs)
             if circles is None or circles[0][0][2] == 0:
                 return im, None
             circles = np.round(circles[0]).astype("int")
-            print(f'{len(circles)} circles found:\n{circles}')
             for i, (x, y, r) in enumerate(circles):
                 cv2.circle(im, (x, y), r, (255, 255, 255), 1)
                 cv2.rectangle(im, (x - 2, y - 2), (x + 2, y + 2), (255, 255, 255), -1)
@@ -188,12 +191,13 @@ class ExperimentalImg(Img):
                         3, (255,255,255), 1);
             return im, circles
 
-        im, circles = _CED_choser(im,
+        im, circles = interactive_circle_finder(self.im,
                                 dp=2,
                                 minDist=3,
-                                param1=100, # cannyHighEdgeThreshold
+                                param1=100, # dummy cannyHighEdgeThreshold
                                 param2=45,
                                 minRadius=1,
+                                bin_thresh=8
                                 )
         if circles is None:
             return None
@@ -251,22 +255,16 @@ class ExperimentalImg(Img):
 
         return chosen_circle
 
-    def read_a(self, im):
+    def read_a(self):
         """Calculates CoC from horizontal image crossection at half for height
         :param im           numpy array image
         :return             diameter of middle maximum or -1 if circle not found
         """
-        circle = self._find_circle(im)
+        circle = self._find_circle()
         if circle is None:
             return -1
         else:
             x, y, r = circle
-            win = cv2.namedWindow('Result')
-            demo = self.im.copy()
-            cv2.circle(demo, (x, y), r, (255, 255, 255), 1)
-            cv2.imshow(win, demo)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
             return 2 * r
 
 class SimulationImg(Img):
@@ -283,6 +281,7 @@ class SimulationImg(Img):
         if self.im is None:
             print('im not loaded for this Img')
             return None
+
         middle_crossection = self.im[int(self.im.shape[0]//2)]
         a_px = 0
         for pixel in middle_crossection:
