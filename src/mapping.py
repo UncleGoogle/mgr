@@ -43,7 +43,8 @@ m, b = np.linalg.lstsq(A, y_sim)[0]
 x_mock = np.array([0, x_sim[-1]])
 plt.plot(x_mock, d/f*x_mock, 'g-', label=f'Incoherent light (CoC proportionally: a=r*x/f)', linewidth=1, markersize=0)
 plt.plot(x_sim, y_sim, 'rx--', label=f'Coherent light - simulations (threshold: {threshold}/255)', linewidth=0, markersize=6)
-plt.plot(x_sim, m*x_sim + b, 'r--', label='Fitted line(simulations)')
+# without intercept - dont use b below
+plt.plot(x_sim, m*x_sim, 'r--', label='Fitted line(simulations)')
 plt.title('CoC size along displacement for bigger lens')
 plt.xlabel('distance from focal point, x [mm]')
 plt.ylabel('spot diameter, a [mm]')
@@ -52,7 +53,7 @@ plt.show()
 
 log_time = datetime.datetime.now()
 
-output_json = {'m': m, 'b': b, 'experimental_data': mapping_sim, 'generated': str(log_time)}
+output_json = {'m': m, 'b': b, 'threshold': threshold, 'experimental_data': mapping_sim, 'generated': str(log_time)}
 with open(f'./output_mapping/mapping.json', 'w') as out_file:
     json.dump(output_json, out_file, indent=4)
 

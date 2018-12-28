@@ -20,3 +20,11 @@ six = "*"
 matplotlib = "*"
 opencv-python = "*"
 ipython = "*"
+scipy = "*"
+scikit-image = "*"
+pip = "*"
+
+
+[pipenv]
+
+keep_outdated = true

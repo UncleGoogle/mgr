@@ -1,5 +1,6 @@
 {
     "maxwell": {
+        "prefix": "_MG_",
         "focus_reference": 59,
         "imgs": [
             {
@@ -168,6 +169,7 @@
     },
 
     "4": {
+        "prefix": "_MG_",
         "focus_reference": 6,
         "imgs": [
             {

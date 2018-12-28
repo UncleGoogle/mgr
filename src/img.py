@@ -16,7 +16,7 @@ from statistics import timeit
 class ImgSet(object):
     """Keeps series of images with common origin"""
 
-    def __init__(self, name, imgs, path):
+    def __init__(self, name, imgs, path, pixel_size=None):
         """
         :param name     name of data set
         :param imgs     array of Img items
@@ -24,6 +24,7 @@ class ImgSet(object):
         """
         self.name = name
         self.imgs = imgs
+        self.pixel_size = pixel_size
         self.path = pathlib.Path(path)
         if not self.path.exists():
             raise RuntimeError(f"given data file dosn't exists {self.path}")
@@ -75,10 +76,12 @@ class ImgSet(object):
         img_sets = {}
         for dataset_name in dataset:
             focus_reference = dataset[dataset_name]['focus_reference']
+            pixel_size = 10 / dataset[dataset_name].get('pixels_per_cm', None)  # mm
             dataset_path = data_path / dataset_name
+            prefix = dataset[dataset_name]['prefix']
             imgs = []
             for i in dataset[dataset_name]['imgs']:
-                im_path = dataset_path / ('_MG_' + str(i['name']) + '.jpg')
+                im_path = dataset_path / (prefix + str(i['name']) + '.jpg')
                 imgs.append(ExperimentalImg(i['kind'],
                                             im_path,
                                             i['x'] - focus_reference,
@@ -86,7 +89,7 @@ class ImgSet(object):
                                             i.get('f'),
                                             ))
 
-            img_sets[dataset_name] = cls(dataset_name, imgs, path=dataset_path)
+            img_sets[dataset_name] = cls(dataset_name, imgs, path=dataset_path, pixel_size=pixel_size)
         return img_sets
 
 
@@ -201,7 +204,7 @@ class ExperimentalImg(Img):
                                 param1=100, # dummy cannyHighEdgeThreshold
                                 param2=45,
                                 minRadius=1,
-                                bin_thresh=8
+                                bin_thresh=12
                                 )
         if circles is None:
             return None
